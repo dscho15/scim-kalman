@@ -1,11 +1,12 @@
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.io import savemat
 
 # define constants
 
 dT = 0.001
-noise = 0.001
+noise = 0.1
 
 # define the constant matrices for the kalman filter:
 
@@ -25,7 +26,7 @@ P = np.eye(N = 7, M = 7)
 R = np.load('settings/cov_mat.npy')
 
 # process noise
-Q = np.eye(N = 7, M = 7) * noise ** 3
+Q = np.eye(N = 7, M = 7) * noise ** 10
 
 class data_loader:
 
@@ -57,38 +58,21 @@ class data_loader:
     def len(self):
         return self.q_data.shape[1]
 
-class kalman_filter:
-    def __init__(self, x0, F, B, H, P, Q, R):
-        
-        # matrices for the kalman-filter
-        self.F = F
-        self.B = B
-        self.H = H
-        self.P = P
-        self.Q = Q
-        self.R = R
+class lowpass_filter:
 
-        # initial state
-        self.x = x0
-    
-    def prediction(self, u):
-        # u is a 7x1 vector of acceleration predictions
-        self.x = self.F @ self.x + self.B @ u
-        self.P = self.F @ self.P @ self.F.T + self.Q
-    
-    def correct(self, meas):
-        # measure is a 7x1 vector of velocities measured from sensors
+    def __init__(self, p):
 
-        # determine residuals and kalman gain
-        y = meas - self.H @ self.x
-        self.K = self.P @ self.H.T @ np.linalg.pinv( self.R + self.H @ self.P @ self.H.T )
+        self.a = np.array([1-p, 1-p, 1-p, 1-p, 1-p, 1-p, 1-p]).reshape(7, 1)
+        self.b = np.array([p, p, p, p, p, p, p]).reshape(7, 1)
+        self.y_prev = np.array([0, 0, 0, 0, 0, 0, 0]).reshape(7, 1)
+        self.y_curr = np.array([0, 0, 0, 0, 0, 0, 0]).reshape(7, 1)
 
-        # correct the state
-        self.x = self.x + self.K @ y
-        self.P = (np.eye(self.K.shape[0], H.shape[1]) - self.K @ self.H) @ self.P
+    def filter(self, x):
+        self.y_prev = self.y_curr
+        self.y_curr = self.a * x + self.b * self.y_prev
 
     def get_state(self):
-        return self.x, self.P, self.K
+        return self.y_curr
 
 class plotting:
     
@@ -102,12 +86,18 @@ class plotting:
     
     def plot(self, col = 1):
         
-        fig, axs = plt.subplots(7)
+        # fig, axs = plt.subplots(7)
+        
+        t = np.linspace(0, 1, self.data[col, 0, :].size, endpoint=False)
 
         for i in range(7):
-            axs[i].plot(self.data[col, i, :])
+            plt.subplot(7, 1, i+1)
+            plt.plot(t, self.data[col, i, :])
+            plt.xlabel("t")
+            plt.ylabel("rad/s")
 
         plt.show()
+        np.savetxt("lp_osc.csv", self.data[col,:,:], delimiter=",")
     
 
 
@@ -118,7 +108,7 @@ loader = data_loader("data_osc/q.csv", "data_osc/qdot.csv", "data_osc/qddot_d.cs
 qdot_pred  = np.zeros((7,1))
 
 # define the kalman filter
-kalman = kalman_filter(qdot_pred, F, B, H, P, Q, R)
+lowpass = lowpass_filter(0.95)
 
 # plotting purposes
 plot_tool = plotting(loader.name(), loader.len())
@@ -130,13 +120,12 @@ for i in range(0, loader.len()):
     q_mes, qdot_mes, q_ddot_d = loader.row(i)
 
     # do the kalman prediction
-    kalman.prediction(q_ddot_d)
-    kalman.correct(qdot_mes)
+    lowpass.filter(qdot_mes)
 
     # update the prediced steta and K etc
-    qdot_pred, P, K = kalman.get_state()
+    qdot_pred = lowpass.get_state()
 
     # insert the data
     plot_tool.insert(qdot_pred.reshape((-1)), i, col = 1)
 
-plot_tool.plot()
+plot_tool.plot() 

@@ -1,6 +1,16 @@
 import csv
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
+
+# mpl.use("pgf")
+# mpl.rcParams.update({
+#     "pgf.texsystem": "pdflatex",
+#     'font.family': 'serif',
+#     'text.usetex': True,
+#     'pgf.rcfonts': False,
+# })
+
 import matplotlib.pyplot as plt
 
 class data_loader:
@@ -39,19 +49,25 @@ class data_loader:
 # init the data loader
 loader = data_loader("data_static/qdot_1_1.csv")
 
-# # read the data
-# df = pd.DataFrame(loader.data().reshape((-1, 7)), columns=loader.name().reshape(-1))
-# pd.plotting.scatter_matrix(df, alpha=0.2, figsize=(15, 15))
-# plt.show()
+# read the data
+df = pd.DataFrame(loader.data().reshape((-1, 7)), columns=loader.name().reshape(-1))
 
-# # boxplot
-# df.quantile()
-# df.boxplot(grid=False)
-# plt.show()
+# calculate quantiles
+q1 = df.quantile(0.25)
+q3 = df.quantile(0.75)
+iqr = q3-q1
+df = df[~((df < (q1 - 1.5 * iqr)) |(df > (q3 + 1.5 * iqr))).any(axis=1)]
+pd.plotting.scatter_matrix(df, alpha=0.2, figsize=(10, 10))
+plt.show()
+# plt.savefig('scattermatrix.png')
+
+# boxplot
+df.quantile()
+df.boxplot(grid=False)
+plt.show()
 
 # determine covariance matrix
 with open('settings/cov_mat.npy', 'wb') as f:
     data = loader.data().T.reshape(7, -1)
-    # create a diag matrix
     cov = np.diag(np.cov(data).diagonal())
     np.save(f, cov)
