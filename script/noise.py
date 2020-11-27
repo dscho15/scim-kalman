@@ -17,7 +17,7 @@ class data_loader:
 
     def __read_data__(self, data):
         temp = list(data)
-        return temp[0], np.array(temp[1:]).astype("float")
+        return temp[0], np.array(temp[2:]).astype("float")
 
     def __init__(self, qdot):
         
@@ -47,7 +47,7 @@ class data_loader:
         return self.q_data.shape[1]
 
 # init the data loader
-loader = data_loader("data_static/qdot_1_1.csv")
+loader = data_loader("data/static/qdot_1_4.csv")
 
 # read the data
 df = pd.DataFrame(loader.data().reshape((-1, 7)), columns=loader.name().reshape(-1))
@@ -70,4 +70,5 @@ plt.show()
 with open('settings/cov_mat.npy', 'wb') as f:
     data = loader.data().T.reshape(7, -1)
     cov = np.diag(np.cov(data).diagonal())
+    print(cov)
     np.save(f, cov)
